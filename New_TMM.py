@@ -73,7 +73,7 @@ class TMM_TE:
             
             F2 = self.F_matrix(kz[which_corrd + 1], d[which_corrd])
             F1 = self.F_matrix(kz[which_corrd], d[which_corrd])
-            N2 = self.N_matrix(kz[which_corrd + 1], mu[which_corrd])
+            N2 = self.N_matrix(kz[which_corrd + 1], mu[which_corrd + 1])
             N1 = self.N_matrix(kz[which_corrd], mu[which_corrd])
             
            # print(-kz[which_corrd] / (self.omega * mu[which_corrd] * self.mu0))
@@ -89,10 +89,29 @@ class TMM_TE:
         
         
         return T
+    
+    def refractive_index(self):
+        eps = self.eps
+        mu = self.mu
+        
+        n = []
+        
+        for i in range(len(eps)):
+            N = np.sqrt(eps[i]*mu[i] + 0j)
+            n.append(N)
+        return n
+        
             
     
     def R_T_coeff(self):
         T = self.Transfer_Matrix()
+        kz = self.kz()
+        mu = self.mu
+        
+        kzi = kz[0]
+        kzt = kz[len(self.eps) - 1]
+        mu_i = mu[0]
+        mu_t = mu[len(self.eps) - 1]
         
         
         t11 = T[0,0]
@@ -100,18 +119,23 @@ class TMM_TE:
         t21 = T[1,0]
         t22 = T[1,1]
         
-        R = abs(t21/t22)**2
-        T = 1 - R
-            
+        t = np.linalg.det(T)/t22
+        S_i = (1/(2*mu_i*self.omega))*(kzi.real)
+        S_t = (1/(2*mu_t*self.omega))*(kzt*abs(t)**2).real
+        
+        R = abs(-t21/t22)**2
+        T = S_t/S_i
+        A = 1 - R - T
             
         
-        #print(R)
+        #print(T)
         
-        return R,T
+        return R,T,A
     
     def plot_R_T(self, angle_range):
         R_values = []
         T_values = []
+        A_values = []
         angles = []
         
 
@@ -123,11 +147,12 @@ class TMM_TE:
             coeff = self.R_T_coeff()
             R_values.append(coeff[0])
             T_values.append(coeff[1])
+            A_values.append(coeff[2])
             angles.append(init_angle*180/pi)
             
             init_angle+=0.001
             
-        return R_values,T_values,angles
+        return R_values,T_values, A_values ,angles
     
 class TMM_TM:
     def __init__(self, eps, mu, d, wavelength, incidence_angle):
@@ -213,6 +238,13 @@ class TMM_TM:
     
     def R_T_coeff(self):
         T = self.Transfer_Matrix()
+        kz = self.kz()
+        eps = self.eps
+        
+        kzi = kz[0]
+        kzt = kz[len(self.eps) - 1]
+        eps_i = eps[0]
+        eps_t = eps[len(self.eps) - 1]
         
         
         t11 = T[0,0]
@@ -220,18 +252,22 @@ class TMM_TM:
         t21 = T[1,0]
         t22 = T[1,1]
         
-        R = abs(t21/t22)**2
-        T = 1 - R
-            
-            
+        t = np.linalg.det(T)/t22
+        S_i = (1/(2*eps_i*self.omega))*(kzi.real)
+        S_t = (1/(2*eps_t*self.omega))*(kzt*abs(t)**2).real
         
-        #print(R)
+        R = abs(-t21/t22)**2
+        T = S_t/S_i
+        A = 1 - R - T
         
-        return R,T
+        #print(T)
+        
+        return R,T,A
     
     def plot_R_T(self, angle_range):
         R_values = []
         T_values = []
+        A_values = []
         angles = []
         
 
@@ -243,20 +279,21 @@ class TMM_TM:
             coeff = self.R_T_coeff()
             R_values.append(coeff[0])
             T_values.append(coeff[1])
+            A_values.append(coeff[2])
             angles.append(init_angle*180/pi)
             
             init_angle+=0.001
             
-        return R_values,T_values,angles
+        return R_values,T_values, A_values ,angles
             
 
 ## Testing
 eps = [2.25,-10+1j,1]
-#eps = [1.3,1,1.3]
+#eps = [1.5,1,1.5]
 mu = [1,1,1]
 d = [0,25e-9]
 wavelength = 1e-6
-incidence_angle = 89
+incidence_angle = 90
 
 
 TMM = TMM_TE(eps, mu, d, wavelength, incidence_angle)   
@@ -265,10 +302,11 @@ TMM2 = TMM_TM(eps, mu, d, wavelength, incidence_angle)
 #print(TMM.kz(eps, mu))
 #print(np.linalg.inv(TMM.F_matrix(4360919.820072095j, 25e-9)))
 
-R_values, T_values, angles = TMM.plot_R_T(incidence_angle)
+R_values, T_values, A_values, angles = TMM.plot_R_T(incidence_angle)
 
 R_val_TM = TMM2.plot_R_T(incidence_angle)[0]
 T_val_TM = TMM2.plot_R_T(incidence_angle)[1]
+A_val_TM = TMM2.plot_R_T(incidence_angle)[2]
 
 
 #print(angles)
@@ -292,6 +330,17 @@ plt.plot(angles, T_val_TM, label="Transmission_TM (T)", color='blue')
 plt.xlabel("Incidence Angle (degrees)")
 plt.ylabel("Coefficient Value")
 plt.title("Transmission Coefficients vs. Incidence Angle")
+plt.legend()
+plt.grid(True)
+plt.show()
+
+plt.figure(figsize=(8, 6))
+#plt.plot(angles, R_val_TM, label="Reflection_TM (R)", color='red')
+plt.plot(angles, A_values, label="Absorption_TE (A)", color='red')
+plt.plot(angles, A_val_TM, label="Absorption_TM (A)", color='blue')
+plt.xlabel("Incidence Angle (degrees)")
+plt.ylabel("Coefficient Value")
+plt.title("Absorption Coefficients vs. Incidence Angle")
 plt.legend()
 plt.grid(True)
 plt.show()
